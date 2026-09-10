@@ -92,8 +92,13 @@ echo  Update Complete!
 echo ========================================
 echo.
 echo Next steps:
-echo 1. Go to chrome://extensions/
+echo 1. Press any key to open chrome://extensions in your browser
 echo 2. Find "Address Helper"
 echo 3. Click the Reload button (circular arrow icon)
 echo.
 pause
+
+REM Open chrome://extensions in default browser
+start chrome://extensions/
+
+exit /b 0
