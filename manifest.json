@@ -1,0 +1,23 @@
+{
+  "name": "Address Helper",
+  "description": "Address helper made for shreemaruti booking screen",
+  "version": "1.0",
+  "manifest_version": 3,
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://innofulfill.com/*",
+        "*://booking.innofulfill.com/*"
+      ],
+      "js": ["config.js", "content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
