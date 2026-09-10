@@ -316,7 +316,7 @@ if (!window.location.href.includes("innofulfill.com")) {
         return;
       }
 
-      const uniqueRecordId = `${formData.senderMobile}_${formData.receiverMobile}`;
+      const uniqueRecordId = `${formData.senderName}|${formData.senderMobile}|${formData.receiverName}|${formData.receiverMobile}`;
       const profileName = `${formData.receiverName || 'Unknown'} (From: ${formData.senderName || 'Unknown'})`;
 
       const db = await openDB();
