@@ -11,9 +11,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://innofulfill.com/*",
-        "*://booking.innofulfill.com/*",
-        "*://bookings.innofulfill.com/*"
+        "*://bookings.innofulfill.com/*",
+        "*://bookings.innofulfill.com/retail-booking"
       ],
       "js": ["config.js", "content.js"]
     }
