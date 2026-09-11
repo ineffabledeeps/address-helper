@@ -1,6 +1,6 @@
 @echo off
 REM Address Helper Extension Auto-Update Script
-REM This script pulls the latest code from GitHub and notifies you to reload the extension
+REM This script pulls the latest code from GitHub using gh CLI and notifies you to reload the extension
 
 echo.
 echo ========================================
@@ -11,57 +11,37 @@ echo.
 REM Get current directory
 cd /d "%~dp0"
 
-REM Check if git is installed
-git --version >nul 2>&1
+REM Check if gh (GitHub CLI) is installed
+gh --version >nul 2>&1
 if errorlevel 1 (
-    echo WARNING: Git is not installed
+    echo WARNING: GitHub CLI (gh) is not installed
     echo.
-    echo Attempting to install Git...
+    echo Attempting to install GitHub CLI...
     echo.
     
-    REM Try using winget first
+    REM Try using winget
     winget --version >nul 2>&1
-    if errorlevel 1 (
-        echo Installing Git using winget...
-        winget install --id Git.Git -e --accept-source-agreements
+    if not errorlevel 1 (
+        echo Installing GitHub CLI using winget...
+        winget install --id GitHub.cli -e --accept-source-agreements
     ) else (
-        REM Fallback: Try chocolatey
-        choco --version >nul 2>&1
-        if errorlevel 1 (
-            echo Installing Git using chocolatey...
-            choco install git -y
-        ) else (
-            REM Last resort: Download and install from official source
-            echo Downloading Git installer from https://git-scm.com/
-            powershell -Command "(New-Object System.Net.ServicePointManager).SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object System.Net.WebClient).DownloadFile('https://github.com/git-for-windows/git/releases/download/v2.45.0.windows.1/Git-2.45.0-64-bit.exe', '%temp%\GitInstaller.exe')"
-            
-            if exist "%temp%\GitInstaller.exe" (
-                echo Running Git installer...
-                "%temp%\GitInstaller.exe" /VERYSILENT /NORESTART
-                timeout /t 5 /nobreak
-                del "%temp%\GitInstaller.exe"
-            ) else (
-                echo.
-                echo ERROR: Could not download Git installer
-                echo Please install Git manually from https://git-scm.com/download/win
-                pause
-                exit /b 1
-            )
-        )
-    )
-    
-    echo.
-    echo Verifying Git installation...
-    git --version >nul 2>&1
-    if errorlevel 1 (
-        echo.
-        echo ERROR: Git installation failed
-        echo Please install Git manually from https://git-scm.com/download/win
+        echo Please install GitHub CLI from: https://cli.github.com/
         pause
         exit /b 1
     )
     
-    echo Git installed successfully!
+    echo.
+    echo Verifying GitHub CLI installation...
+    gh --version >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo ERROR: GitHub CLI installation failed
+        echo Please install it manually from https://cli.github.com/
+        pause
+        exit /b 1
+    )
+    
+    echo GitHub CLI installed successfully!
     echo.
 )
 
@@ -75,7 +55,7 @@ if not exist ".git" (
 echo Pulling latest updates from GitHub...
 echo.
 
-REM Pull latest code
+REM Pull latest code using git (with gh authentication)
 git pull
 
 if errorlevel 1 (
@@ -91,6 +71,14 @@ echo ========================================
 echo  Update Complete!
 echo ========================================
 echo.
+
+REM Show repository info
+for /f "tokens=*" %%i in ('gh repo view --json nameWithOwner --jq .nameWithOwner 2^>nul') do set REPO_INFO=%%i
+if defined REPO_INFO (
+    echo Repository: %REPO_INFO%
+    echo.
+)
+
 echo Next steps:
 echo 1. Press any key to open chrome://extensions in your browser
 echo 2. Find "Address Helper"
