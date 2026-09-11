@@ -82,15 +82,15 @@ if (!window.location.href.includes("innofulfill.com")) {
   `;
   customDialog.innerHTML = `
     <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 400px; text-align: center;">
-      <h3 style="color: #ff9800; margin-top: 0;">⚠️ Low Freight Warning</h3>
+      <h3 style="color: #d32f2f; margin-top: 0;">⚠️ Freight Below Minimum</h3>
       <p style="font-size: 14px; color: #555; margin: 15px 0;">
-        Your freight value is below the recommended minimum of <strong>100</strong>.
+        The minimum freight required is <strong>120</strong>.
       </p>
       <p style="font-size: 16px; font-weight: bold; color: #d32f2f; margin: 15px 0;" id="freight-value-display"></p>
-      <p style="font-size: 13px; color: #777; margin: 15px 0;">Proceed with this value or adjust it?</p>
+      <p style="font-size: 13px; color: #777; margin: 15px 0;">Do you want to proceed anyway?</p>
       <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 20px;">
-        <button id="freight-confirm-less" style="flex: 1; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Proceed</button>
-        <button id="freight-make-120" style="flex: 1; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Set to 100</button>
+        <button id="freight-confirm-less" style="flex: 1; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Yes, Proceed</button>
+        <button id="freight-make-120" style="flex: 1; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Make 120</button>
       </div>
     </div>
   `;
@@ -107,11 +107,11 @@ if (!window.location.href.includes("innofulfill.com")) {
       };
 
       document.getElementById('freight-make-120').onclick = () => {
-        document.querySelector('#freight').value = '100';
+        document.querySelector('#freight').value = '120';
         document.querySelector('#freight').dispatchEvent(new Event('input', { bubbles: true }));
         document.querySelector('#freight').dispatchEvent(new Event('change', { bubbles: true }));
         customDialog.style.display = 'none';
-        console.log("✓ Address Helper: Freight value set to 100");
+        console.log("✓ Address Helper: Freight value set to 120");
         resolve('adjusted');
       };
     });
@@ -436,11 +436,27 @@ if (!window.location.href.includes("innofulfill.com")) {
   }
 
   function checkFreightWarning() {
-    // No freight validation - accept any value
+    const freight = document.querySelector('#freight')?.value;
+    const MIN_FREIGHT = 120;
+    
+    if (!freight || freight === "") {
+      return null; // No freight value, skip check
+    }
+    
+    const freightValue = parseFloat(freight);
+    if (freightValue < MIN_FREIGHT) {
+      return {
+        needsConfirm: true,
+        message: `Freight below minimum!\n\nYour freight value: ${freightValue}\n\nMinimum required: ${MIN_FREIGHT}\n\nDo you want to proceed anyway?`
+      };
+    }
+    
     return { needsConfirm: false };
   }
 
   // --- 9. GLOBAL INTERCEPTORS ---
+  let freightWarningHandled = false;
+  
   document.addEventListener('click', async (event) => {
     const targetElement = event.target;
     if (targetElement && (targetElement.innerText === "CONFIRM BOOKING" || targetElement.textContent?.includes("CONFIRM BOOKING"))) {
@@ -451,6 +467,38 @@ if (!window.location.href.includes("innofulfill.com")) {
         console.warn("⚠️ Address Helper: Booking blocked due to validation errors:", validation.errors);
         event.preventDefault();
         event.stopPropagation();
+        return;
+      }
+      
+      // Check freight warning
+      const freightCheck = checkFreightWarning();
+      if (freightCheck && freightCheck.needsConfirm && !freightWarningHandled) {
+        console.warn("⚠️ Address Helper: Freight warning detected");
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const freight = document.querySelector('#freight')?.value;
+        const result = await showFreightWarningDialog(freight);
+        
+        if (result === 'proceed') {
+          console.log("✓ Address Helper: User explicitly confirmed to proceed with freight value: " + freight);
+          captureAndSaveForm("CONFIRM BOOKING BUTTON CLICK");
+          // Allow the next click to proceed
+          freightWarningHandled = true;
+          setTimeout(() => {
+            targetElement.click();
+            freightWarningHandled = false;  // Reset flag
+          }, 100);
+        } else if (result === 'adjusted') {
+          console.log("✓ Address Helper: Freight adjusted to 120, proceeding with booking");
+          captureAndSaveForm("CONFIRM BOOKING BUTTON CLICK");
+          // Allow the next click to proceed
+          freightWarningHandled = true;
+          setTimeout(() => {
+            targetElement.click();
+            freightWarningHandled = false;  // Reset flag
+          }, 100);
+        }
         return;
       }
       
