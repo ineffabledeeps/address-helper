@@ -82,15 +82,15 @@ if (!window.location.href.includes("innofulfill.com")) {
   `;
   customDialog.innerHTML = `
     <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 400px; text-align: center;">
-      <h3 style="color: #d32f2f; margin-top: 0;">Freight Warning</h3>
+      <h3 style="color: #ff9800; margin-top: 0;">⚠️ Low Freight Warning</h3>
       <p style="font-size: 14px; color: #555; margin: 15px 0;">
-        Minimum freight of <strong>120</strong> is recommended.
+        Your freight value is below the recommended minimum of <strong>100</strong>.
       </p>
-      <p style="font-size: 16px; font-weight: bold; color: #333; margin: 15px 0;" id="freight-value-display"></p>
-      <p style="font-size: 13px; color: #777; margin: 15px 0;">Do you want to proceed or adjust the freight?</p>
+      <p style="font-size: 16px; font-weight: bold; color: #d32f2f; margin: 15px 0;" id="freight-value-display"></p>
+      <p style="font-size: 13px; color: #777; margin: 15px 0;">Proceed with this value or adjust it?</p>
       <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 20px;">
-        <button id="freight-confirm-less" style="flex: 1; padding: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Confirm with less</button>
-        <button id="freight-make-120" style="flex: 1; padding: 10px; background: #388e3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Make 120</button>
+        <button id="freight-confirm-less" style="flex: 1; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Proceed</button>
+        <button id="freight-make-120" style="flex: 1; padding: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Set to 100</button>
       </div>
     </div>
   `;
@@ -107,11 +107,11 @@ if (!window.location.href.includes("innofulfill.com")) {
       };
 
       document.getElementById('freight-make-120').onclick = () => {
-        document.querySelector('#freight').value = '120';
+        document.querySelector('#freight').value = '100';
         document.querySelector('#freight').dispatchEvent(new Event('input', { bubbles: true }));
         document.querySelector('#freight').dispatchEvent(new Event('change', { bubbles: true }));
         customDialog.style.display = 'none';
-        console.log("✓ Address Helper: Freight value changed to 120");
+        console.log("✓ Address Helper: Freight value set to 100");
         resolve('adjusted');
       };
     });
@@ -130,12 +130,78 @@ if (!window.location.href.includes("innofulfill.com")) {
       <h3 style="margin:0; color:#333;">Matching Profiles</h3>
       <button id='close-helper-sidebar' style='background:none; border:none; font-size:20px; cursor:pointer; color:#999;'>&times;</button>
     </div>
+    <div style="margin-bottom:15px;">
+      <input 
+        type="text" 
+        id="sidebar-search-input" 
+        placeholder="Search by name, phone or address..." 
+        style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:13px; box-sizing:border-box;"
+      />
+    </div>
     <div id="sidebar-results-container"></div>
   `;
   document.body.appendChild(sidebar);
 
   document.getElementById('close-helper-sidebar').addEventListener('click', () => {
     sidebar.style.right = '-350px';
+    // Clear search input when sidebar closes
+    document.getElementById('sidebar-search-input').value = '';
+    document.getElementById('sidebar-results-container').innerHTML = '';
+  });
+
+  // --- 3.5 SIDEBAR SEARCH FUNCTIONALITY ---
+  async function searchAllProfiles(query) {
+    const searchTerm = query.toLowerCase().trim();
+    
+    if (!searchTerm) {
+      // If search is empty, clear results
+      const container = document.getElementById('sidebar-results-container');
+      container.innerHTML = '';
+      return;
+    }
+
+    try {
+      const db = await openDB();
+      const tx = db.transaction(DB_CONFIG.objectStore, "readonly");
+      const store = tx.objectStore(DB_CONFIG.objectStore);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const allRecords = request.result;
+        const filtered = allRecords.filter(record => {
+          const f = record.fields;
+          return (
+            (f.senderName?.toLowerCase().includes(searchTerm)) ||
+            (f.receiverName?.toLowerCase().includes(searchTerm)) ||
+            (f.senderMobile?.includes(searchTerm)) ||
+            (f.receiverMobile?.includes(searchTerm)) ||
+            (f.senderAddress?.toLowerCase().includes(searchTerm)) ||
+            (f.receiverAddress?.toLowerCase().includes(searchTerm))
+          );
+        });
+        
+        console.log(`🔎 Address Helper: Sidebar search found ${filtered.length} matching profiles for query: "${searchTerm}"`);
+        renderResults(filtered);
+      };
+
+      request.onerror = () => {
+        console.error("❌ Address Helper DB Error during sidebar search:", request.error);
+      };
+    } catch (err) {
+      console.error("❌ Address Helper Error in searchAllProfiles:", err);
+    }
+  }
+
+  // Add event listener for sidebar search input
+  const searchInput = document.getElementById('sidebar-search-input');
+  const debouncedSidebarSearch = debounce((query) => {
+    searchAllProfiles(query);
+  }, 300);
+
+  searchInput.addEventListener('input', (event) => {
+    const query = event.target.value;
+    console.log(`🔍 Address Helper Sidebar: Search input changed to: "${query}"`);
+    debouncedSidebarSearch(query);
   });
 
   // --- 4. DEBOUNCE UTILITY ---
@@ -370,21 +436,7 @@ if (!window.location.href.includes("innofulfill.com")) {
   }
 
   function checkFreightWarning() {
-    const freight = document.querySelector('#freight')?.value;
-    const MIN_FREIGHT = 120;
-    
-    if (!freight || freight === "") {
-      return null; // No freight value, skip check
-    }
-    
-    const freightValue = parseFloat(freight);
-    if (freightValue < MIN_FREIGHT) {
-      return {
-        needsConfirm: true,
-        message: `Minimum freight of ${MIN_FREIGHT} is recommended.\n\nYour freight value: ${freightValue}\n\nDo you really want to proceed with this booking?`
-      };
-    }
-    
+    // No freight validation - accept any value
     return { needsConfirm: false };
   }
 
@@ -402,27 +454,7 @@ if (!window.location.href.includes("innofulfill.com")) {
         return;
       }
       
-      // Check freight warning
-      const freightCheck = checkFreightWarning();
-      if (freightCheck && freightCheck.needsConfirm) {
-        console.warn("⚠️ Address Helper: Freight warning detected");
-        event.preventDefault();
-        event.stopPropagation();
-        
-        const freight = document.querySelector('#freight')?.value;
-        const result = await showFreightWarningDialog(freight);
-        
-        if (result === 'adjusted') {
-          console.log("✓ Address Helper: Freight adjusted to 120, proceeding with booking");
-          captureAndSaveForm("CONFIRM BOOKING BUTTON CLICK");
-        } else if (result === 'proceed') {
-          console.log("✓ Address Helper: User confirmed to proceed with low freight value");
-          captureAndSaveForm("CONFIRM BOOKING BUTTON CLICK");
-        }
-        return;
-      }
-      
-      // If all validations pass, proceed with save
+      // If all validations pass, proceed with save and booking
       captureAndSaveForm("CONFIRM BOOKING BUTTON CLICK");
     }
   });
@@ -436,7 +468,33 @@ if (!window.location.href.includes("innofulfill.com")) {
     try {
       if (message.action === "OPEN_SIDEBAR") {
         console.log("📥 Address Helper Content: Received manual override trigger from Popup UI.");
-        searchProfiles(true); 
+        sidebar.style.right = '0px';
+        
+        // Clear search input
+        const searchInput = document.getElementById('sidebar-search-input');
+        searchInput.value = '';
+        searchInput.focus();
+        
+        // Load all profiles sorted by recent first
+        (async () => {
+          try {
+            const db = await openDB();
+            const tx = db.transaction(DB_CONFIG.objectStore, "readonly");
+            const store = tx.objectStore(DB_CONFIG.objectStore);
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+              const allRecords = request.result;
+              const sorted = allRecords.sort((a, b) => b.timestamp - a.timestamp);
+              console.log(`📂 Address Helper: Loaded ${sorted.length} profiles in sidebar`);
+              renderResults(sorted);
+              sidebar.style.right = '0px';
+            };
+          } catch (err) {
+            console.error("❌ Address Helper Error loading profiles:", err);
+          }
+        })();
+        
         sendResponse({ status: "success", message: "Sidebar opened" });
       }
     } catch (err) {
