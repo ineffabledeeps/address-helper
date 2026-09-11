@@ -12,7 +12,8 @@
     {
       "matches": [
         "*://innofulfill.com/*",
-        "*://booking.innofulfill.com/*"
+        "*://booking.innofulfill.com/*",
+        "*://bookings.innofulfill.com/*"
       ],
       "js": ["config.js", "content.js"]
     }
