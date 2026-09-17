@@ -1,8 +1,16 @@
 // --- URL SAFETY LOCK ---
-if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TARGET_PATH) {
-  // Safe exit if not on the target booking page
-  console.log("⚠️ Address Helper: Not running on the target booking page.");
-} else {
+let addressHelperInitialized = false;
+let addressHelperEventController = null;
+let addressHelperMessageHandler = null;
+
+function initializeAddressHelper() {
+  if (addressHelperInitialized || !isTargetBookingPage()) {
+    return;
+  }
+
+  addressHelperInitialized = true;
+  addressHelperEventController = new AbortController();
+  const eventListenerOptions = { signal: addressHelperEventController.signal };
   console.log("🚀 Address Helper: Content script active and initialized safely.");
 
   // --- DIAGNOSTIC FUNCTION ---
@@ -52,14 +60,14 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
   document.addEventListener('DOMContentLoaded', () => {
     console.log("📄 Address Helper: Page loaded, scanning for form fields...");
     window.addressHelperDiagnostics();
-  });
+  }, eventListenerOptions);
 
   // Also run on page load if DOM is already loaded
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       console.log("📄 Address Helper: Page loaded, scanning for form fields...");
       window.addressHelperDiagnostics();
-    });
+    }, eventListenerOptions);
   } else {
     console.log("📄 Address Helper: Page already loaded, scanning for form fields...");
     window.addressHelperDiagnostics();
@@ -147,7 +155,7 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
     // Clear search input when sidebar closes
     document.getElementById('sidebar-search-input').value = '';
     document.getElementById('sidebar-results-container').innerHTML = '';
-  });
+  }, eventListenerOptions);
 
   // --- 3.5 SIDEBAR SEARCH FUNCTIONALITY ---
   async function searchAllProfiles(query) {
@@ -202,7 +210,7 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
     const query = event.target.value;
     console.log(`🔍 Address Helper Sidebar: Search input changed to: "${query}"`);
     debouncedSidebarSearch(query);
-  });
+  }, eventListenerOptions);
 
   // --- 4. DEBOUNCE UTILITY ---
   function debounce(func, delay) {
@@ -341,12 +349,16 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
   }, 500);
 
   document.addEventListener('input', (event) => {
+    if (!isTargetBookingPage()) {
+      return;
+    }
+
     const isSearchField = searchSelectors.some(selector => event.target.matches(selector));
     if (isSearchField) {
       console.log(`✏️ Address Helper: Input detected in field:`, event.target.id, "Value:", event.target.value);
       debouncedSearch();
     }
-  });
+  }, eventListenerOptions);
 
   // --- 8. CORE SAVE ACTION MECHANISM ---
   async function captureAndSaveForm(triggerType) {
@@ -458,6 +470,10 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
   let freightWarningHandled = false;
   
   document.addEventListener('click', async (event) => {
+    if (!isTargetBookingPage()) {
+      return;
+    }
+
     const targetElement = event.target;
     if (targetElement && (targetElement.innerText === "CONFIRM BOOKING" || targetElement.textContent?.includes("CONFIRM BOOKING"))) {
       
@@ -505,14 +521,18 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
       // If all validations pass, proceed with save and booking
       captureAndSaveForm("CONFIRM BOOKING BUTTON CLICK");
     }
-  });
+  }, eventListenerOptions);
 
   document.addEventListener('submit', (event) => {
+    if (!isTargetBookingPage()) {
+      return;
+    }
+
     captureAndSaveForm("FORM SUBMIT EVENT");
-  });
+  }, eventListenerOptions);
 
   // --- 10. POPUP MESSAGE HANDLER ---
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  addressHelperMessageHandler = (message, sender, sendResponse) => {
     try {
       if (message.action === "OPEN_SIDEBAR") {
         console.log("📥 Address Helper Content: Received manual override trigger from Popup UI.");
@@ -549,6 +569,46 @@ if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TAR
       console.error("❌ Address Helper Message Handler Error:", err);
       sendResponse({ status: "error", message: err.message });
     }
-  });
+  };
+  chrome.runtime.onMessage.addListener(addressHelperMessageHandler);
 
-} // End of main safety lock block
+} // End of initializeAddressHelper
+
+function cleanupAddressHelper() {
+  if (!addressHelperInitialized) {
+    return;
+  }
+
+  addressHelperEventController.abort();
+  chrome.runtime.onMessage.removeListener(addressHelperMessageHandler);
+  document.getElementById('freight-warning-dialog')?.remove();
+  document.getElementById('address-helper-sidebar')?.remove();
+  delete window.addressHelperDiagnostics;
+  addressHelperEventController = null;
+  addressHelperMessageHandler = null;
+  addressHelperInitialized = false;
+  console.log("🧹 Address Helper: Cleaned up after leaving the target booking page.");
+}
+
+function notifyAddressHelperOfNavigation() {
+  if (isTargetBookingPage()) {
+    initializeAddressHelper();
+  } else {
+    cleanupAddressHelper();
+  }
+}
+
+const originalPushState = history.pushState;
+history.pushState = function(...args) {
+  originalPushState.apply(this, args);
+  notifyAddressHelperOfNavigation();
+};
+
+const originalReplaceState = history.replaceState;
+history.replaceState = function(...args) {
+  originalReplaceState.apply(this, args);
+  notifyAddressHelperOfNavigation();
+};
+
+window.addEventListener('popstate', notifyAddressHelperOfNavigation);
+notifyAddressHelperOfNavigation();
