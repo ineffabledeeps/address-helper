@@ -598,6 +598,14 @@ function notifyAddressHelperOfNavigation() {
   }
 }
 
+let lastKnownUrl = window.location.href;
+setInterval(() => {
+  if (window.location.href !== lastKnownUrl) {
+    lastKnownUrl = window.location.href;
+    notifyAddressHelperOfNavigation();
+  }
+}, 250);
+
 const originalPushState = history.pushState;
 history.pushState = function(...args) {
   originalPushState.apply(this, args);

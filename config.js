@@ -28,5 +28,6 @@ const TARGET_HOST = "bookings.innofulfill.com";
 const TARGET_PATH = "/retail-booking";
 
 function isTargetBookingPage() {
-  return window.location.hostname === TARGET_HOST && window.location.pathname === TARGET_PATH;
+  const currentPath = window.location.pathname.replace(/\/$/, "");
+  return window.location.hostname === TARGET_HOST && currentPath === TARGET_PATH;
 }
