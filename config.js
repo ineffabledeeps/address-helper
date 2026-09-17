@@ -24,3 +24,5 @@ const DB_CONFIG = {
 };
 
 const TARGET_DOMAIN = "innofulfill.com";
+const TARGET_HOST = "bookings.innofulfill.com";
+const TARGET_PATH = "/retail-booking";

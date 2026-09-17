@@ -1,7 +1,7 @@
 // --- URL SAFETY LOCK ---
-if (!window.location.href.includes("innofulfill.com")) {
-  // Safe exit if not on the target domain
-  console.log("⚠️ Address Helper: Not running on target domain.");
+if (window.location.hostname !== TARGET_HOST || window.location.pathname !== TARGET_PATH) {
+  // Safe exit if not on the target booking page
+  console.log("⚠️ Address Helper: Not running on the target booking page.");
 } else {
   console.log("🚀 Address Helper: Content script active and initialized safely.");
 
